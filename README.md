@@ -9,6 +9,7 @@ A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 
 ## Features
 
+- **Zero dependencies** - release binaries include embedded pandoc
 - Parses MIME-encoded Confluence exports (not binary `.doc` files)
 - Uses pandoc for high-quality HTML-to-Markdown conversion
 - Cleans up Confluence-specific HTML artifacts
@@ -17,11 +18,11 @@ A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 - Handles collapsible sections, code blocks, and tables
 - Batch convert entire directories
 
-## Requirements
-
-- [pandoc](https://pandoc.org/installing.html) must be installed
-
 ## Installation
+
+### From releases (recommended)
+
+Download the binary for your platform from [Releases](https://github.com/aqueeb/confluence2md/releases). Release binaries include an embedded pandoc, so there are **no external dependencies**.
 
 ### From source
 
@@ -29,9 +30,7 @@ A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 go install github.com/aqueeb/confluence2md@latest
 ```
 
-### From releases
-
-Download the binary for your platform from [Releases](https://github.com/aqueeb/confluence2md/releases).
+> **Note:** Building from source requires [pandoc](https://pandoc.org/installing.html) to be installed on your system.
 
 ## Usage
 
