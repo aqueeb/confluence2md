@@ -49,5 +49,8 @@ jobs:
             exit 1
           fi
 
+      - name: Download embedded Pandoc binaries
+        run: ./scripts/download-pandoc.sh
+
       - name: Vet
         run: go vet ./...
