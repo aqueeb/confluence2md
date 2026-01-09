@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"confluence2md/converter"
+	"github.com/aqueeb/confluence2md/converter"
 )
 
 var (

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"confluence2md/internal/pandoc"
+	"github.com/aqueeb/confluence2md/internal/pandoc"
 )
 
 // CheckPandoc verifies that pandoc is available (embedded or in PATH).
