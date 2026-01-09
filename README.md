@@ -1,0 +1,97 @@
+# confluence2md
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqueeb/confluence2md)](https://goreportcard.com/report/github.com/aqueeb/confluence2md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/aqueeb/confluence2md)](https://github.com/aqueeb/confluence2md/releases)
+
+A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
+
+## Features
+
+- Parses MIME-encoded Confluence exports (not binary `.doc` files)
+- Uses pandoc for high-quality HTML-to-Markdown conversion
+- Cleans up Confluence-specific HTML artifacts
+- Converts emoji images to Unicode (✅ ❌ 🚧 ⚠️)
+- Converts info/tip/warning boxes to blockquotes
+- Handles collapsible sections, code blocks, and tables
+- Batch convert entire directories
+
+## Requirements
+
+- [pandoc](https://pandoc.org/installing.html) must be installed
+
+## Installation
+
+### From source
+
+```bash
+go install github.com/aqueeb/confluence2md@latest
+```
+
+### From releases
+
+Download the binary for your platform from [Releases](https://github.com/aqueeb/confluence2md/releases).
+
+## Usage
+
+```bash
+# Convert a single file
+confluence2md document.doc
+
+# Convert with custom output path
+confluence2md -o output.md document.doc
+
+# Convert all .doc files in a directory
+confluence2md --dir /path/to/docs
+
+# Preview what would be converted (dry run)
+confluence2md --dir /path/to/docs --dry-run
+
+# Verbose output
+confluence2md -v document.doc
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `-o, --output` | Output file path (default: input with `.md` extension) |
+| `--dir` | Convert all `.doc` files in directory |
+| `-v, --verbose` | Show detailed processing info |
+| `--dry-run` | Show what would be converted without writing |
+| `--version` | Show version |
+
+## What it converts
+
+This tool specifically handles **Confluence MIME exports** - files that look like `.doc` but are actually MIME-encoded HTML. These are created when exporting pages from Confluence to Word format.
+
+It does **not** handle:
+- Binary Microsoft Word `.doc` files
+- `.docx` files (use pandoc directly for these)
+
+## How it works
+
+1. **MIME parsing**: Extracts HTML content from the multipart MIME message
+2. **Pandoc conversion**: Converts HTML to GitHub-flavored Markdown
+3. **Post-processing**: Cleans up Confluence-specific artifacts:
+   - Removes wrapper divs (`Section1`, `toc-macro`)
+   - Converts info boxes to blockquotes (`> **Tip:**`, `> **Note:**`)
+   - Replaces emoji images with Unicode characters
+   - Fixes code block language hints
+   - Balances orphaned HTML tags
+
+## Support
+
+If this tool saved you time, consider buying me a coffee:
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/aqueeb)
+
+Or just star the repo — it helps others discover this tool!
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
