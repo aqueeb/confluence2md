@@ -14,7 +14,7 @@ var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
-	repoURL = "https://github.com/aqueeb/confluence2md_private"
+	repoURL = "https://github.com/aqueeb/confluence2md"
 )
 
 func main() {
@@ -217,9 +217,10 @@ func generateOutputPath(inputPath string) string {
 	return filepath.Join(dir, name+".md")
 }
 
-// printStarPrompt prints a message asking users to star the repo.
+// printStarPrompt prints a message asking users to star the repo and support.
 func printStarPrompt() {
 	fmt.Println()
-	fmt.Println("⭐ If this tool was helpful, please star the repo:")
-	fmt.Printf("   %s\n", repoURL)
+	fmt.Println("Glad I could help! If you found this useful:")
+	fmt.Printf("   ⭐ Star the repo: %s\n", repoURL)
+	fmt.Println("   ☕ Buy me a coffee: https://buymeacoffee.com/aqueeb")
 }
