@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="confluence2md logo" width="128">
+  <img src="logo.png" alt="confluence2md logo" width="256">
 </p>
 
 <h1 align="center">confluence2md</h1>
