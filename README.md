@@ -25,11 +25,9 @@ A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 Download the binary for your platform from [Releases](https://github.com/aqueeb/confluence2md/releases). Release binaries include an embedded pandoc, so there are **no external dependencies**.
 
 > [!IMPORTANT]
-> **macOS users:** If you see "Apple could not verify" warning, run:
-> ```bash
-> xattr -d com.apple.quarantine /path/to/confluence2md
-> ```
-> Or right-click the binary in Finder, select "Open", and confirm.
+> **macOS users:** If you see "Apple could not verify" warning, either:
+> - Run `xattr -d com.apple.quarantine /path/to/confluence2md` in Terminal, or
+> - Go to **System Settings → Privacy & Security** and click "Open Anyway"
 
 ### From source
 
