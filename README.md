@@ -1,9 +1,15 @@
-# confluence2md
+<p align="center">
+  <img src="logo.png" alt="confluence2md logo" width="128">
+</p>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqueeb/confluence2md)](https://goreportcard.com/report/github.com/aqueeb/confluence2md)
-[![License: Dual](https://img.shields.io/badge/License-Dual%20(Non--Commercial%20Free)-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/aqueeb/confluence2md)](https://github.com/aqueeb/confluence2md/releases)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buymeacoffee)](https://buymeacoffee.com/aqueeb)
+<h1 align="center">confluence2md</h1>
+
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/aqueeb/confluence2md"><img src="https://goreportcard.com/badge/github.com/aqueeb/confluence2md" alt="Go Report Card"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Dual%20(Non--Commercial%20Free)-blue.svg" alt="License: Dual"></a>
+  <a href="https://github.com/aqueeb/confluence2md/releases"><img src="https://img.shields.io/github/v/release/aqueeb/confluence2md" alt="Release"></a>
+  <a href="https://buymeacoffee.com/aqueeb"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buymeacoffee" alt="Buy Me A Coffee"></a>
+</p>
 
 A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 
