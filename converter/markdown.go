@@ -299,18 +299,18 @@ func preProcessHTML(html string) string {
 func postProcessMarkdown(md string) string {
 	// Replace emoji images with Unicode characters
 	emojiReplacements := map[string]string{
-		`(tick)`:      "✅ ",
-		`(error)`:     "❌ ",
-		`(blue star)`: "🚧",
-		`(warning)`:   "⚠️ ",
-		`(info)`:      "ℹ️ ",
-		`(question)`:  "❓ ",
-		`(plus)`:      "➕ ",
-		`(minus)`:     "➖ ",
-		`(on)`:        "💡 ",
-		`(off)`:       "⭕ ",
-		`(star)`:      "⭐ ",
-		`(thumbs up)`: "👍 ",
+		`(tick)`:        "✅ ",
+		`(error)`:       "❌ ",
+		`(blue star)`:   "🚧",
+		`(warning)`:     "⚠️ ",
+		`(info)`:        "ℹ️ ",
+		`(question)`:    "❓ ",
+		`(plus)`:        "➕ ",
+		`(minus)`:       "➖ ",
+		`(on)`:          "💡 ",
+		`(off)`:         "⭕ ",
+		`(star)`:        "⭐ ",
+		`(thumbs up)`:   "👍 ",
 		`(thumbs down)`: "👎 ",
 	}
 

@@ -1,8 +1,9 @@
 # confluence2md
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqueeb/confluence2md)](https://goreportcard.com/report/github.com/aqueeb/confluence2md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Dual](https://img.shields.io/badge/License-Dual%20(Non--Commercial%20Free)-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/aqueeb/confluence2md)](https://github.com/aqueeb/confluence2md/releases)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buymeacoffee)](https://buymeacoffee.com/aqueeb)
 
 A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 
@@ -94,4 +95,4 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+**Dual License** — Free for non-commercial use. Commercial use requires a paid license. See [LICENSE](LICENSE) for details.

@@ -1,21 +1,36 @@
-MIT License
+# Dual License
 
 Copyright (c) 2025 Aqueeb
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software is licensed under a dual license model:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## Non-Commercial Use (Free)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Permission is hereby granted, free of charge, to any individual or organization obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, modify, and distribute the Software for **non-commercial purposes only**, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+2. Non-commercial use includes:
+   - Personal projects
+   - Educational purposes
+   - Academic research
+   - Open source projects that are themselves non-commercial
+
+3. The Software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the Software or the use or other dealings in the Software.
+
+## Commercial Use (Paid License Required)
+
+For any commercial use of this Software, you must obtain a commercial license. Commercial use includes, but is not limited to:
+
+- Using the Software in a commercial product or service
+- Using the Software in a business environment for internal tools
+- Using the Software to generate revenue directly or indirectly
+- Distributing the Software as part of a paid product
+
+To obtain a commercial license, please contact:
+- Email: aqueeb@users.noreply.github.com
+- GitHub: https://github.com/aqueeb
+
+---
+
+**Summary:** Free for personal/educational use. Commercial use requires a paid license.

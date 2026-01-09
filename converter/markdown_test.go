@@ -356,23 +356,23 @@ func TestPreProcessHTML_ImageSimplification(t *testing.T) {
 
 func TestPostProcessMarkdown_EscapedHTML(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
+		name             string
+		input            string
 		shouldNotContain []string
 	}{
 		{
-			name:  "escaped br tags",
-			input: `Text\<br\>more text`,
+			name:             "escaped br tags",
+			input:            `Text\<br\>more text`,
 			shouldNotContain: []string{`\<br\>`},
 		},
 		{
-			name:  "escaped div tags",
-			input: `\<div class="test"\>content\</div\>`,
+			name:             "escaped div tags",
+			input:            `\<div class="test"\>content\</div\>`,
 			shouldNotContain: []string{`\<div`, `\</div`},
 		},
 		{
-			name:  "escaped p tags",
-			input: `\<p\>paragraph\</p\>`,
+			name:             "escaped p tags",
+			input:            `\<p\>paragraph\</p\>`,
 			shouldNotContain: []string{`\<p\>`, `\</p\>`},
 		},
 	}
