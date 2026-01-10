@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -142,9 +143,8 @@ func decodeHTMLEntities(html string) string {
 	html = hexEntityPattern.ReplaceAllStringFunc(html, func(match string) string {
 		submatches := hexEntityPattern.FindStringSubmatch(match)
 		if len(submatches) > 1 {
-			var val int
-			fmt.Sscanf(submatches[1], "%x", &val)
-			if val > 0 && val < maxASCIICodePoint {
+			val, err := strconv.ParseInt(submatches[1], 16, 32)
+			if err == nil && val > 0 && val < maxASCIICodePoint {
 				return string(rune(val))
 			}
 		}
@@ -157,9 +157,8 @@ func decodeHTMLEntities(html string) string {
 	html = decEntityPattern.ReplaceAllStringFunc(html, func(match string) string {
 		submatches := decEntityPattern.FindStringSubmatch(match)
 		if len(submatches) > 1 {
-			var val int
-			fmt.Sscanf(submatches[1], "%d", &val)
-			if val > 0 && val < maxASCIICodePoint {
+			val, err := strconv.ParseInt(submatches[1], 10, 32)
+			if err == nil && val > 0 && val < maxASCIICodePoint {
 				return string(rune(val))
 			}
 		}
