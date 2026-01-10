@@ -170,3 +170,196 @@ Just plain text, no HTML
 	}
 }
 
+func TestExtractHTMLFromMIME_InvalidMIME(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test non-multipart content type
+	nonMultipartContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+Message-ID: <1234567890.123.1234567890123@test>
+Subject: Test
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+This is not a multipart message.
+`
+	nonMultipartFile := filepath.Join(tmpDir, "non-multipart.doc")
+	if err := os.WriteFile(nonMultipartFile, []byte(nonMultipartContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	_, err := ExtractHTMLFromMIME(nonMultipartFile)
+	if err == nil {
+		t.Error("Expected error for non-multipart content")
+	}
+	if !strings.Contains(err.Error(), "expected multipart") {
+		t.Errorf("Expected 'expected multipart' error, got: %v", err)
+	}
+
+	// Test multipart without boundary
+	noBoundaryContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+Message-ID: <1234567890.123.1234567890123@test>
+Subject: Test
+MIME-Version: 1.0
+Content-Type: multipart/related
+
+This has no boundary.
+`
+	noBoundaryFile := filepath.Join(tmpDir, "no-boundary.doc")
+	if err := os.WriteFile(noBoundaryFile, []byte(noBoundaryContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	_, err = ExtractHTMLFromMIME(noBoundaryFile)
+	if err == nil {
+		t.Error("Expected error for missing boundary")
+	}
+	if !strings.Contains(err.Error(), "no boundary") {
+		t.Errorf("Expected 'no boundary' error, got: %v", err)
+	}
+
+	// Test invalid MIME message (not parseable)
+	invalidMIMEContent := `This is not a valid MIME message at all.
+No headers, no structure.
+`
+	invalidMIMEFile := filepath.Join(tmpDir, "invalid-mime.doc")
+	if err := os.WriteFile(invalidMIMEFile, []byte(invalidMIMEContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	_, err = ExtractHTMLFromMIME(invalidMIMEFile)
+	if err == nil {
+		t.Error("Expected error for invalid MIME message")
+	}
+}
+
+func TestExtractHTMLFromMIME_NoTransferEncoding(t *testing.T) {
+	// Test HTML without transfer encoding (should read directly)
+	mimeContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+Message-ID: <1234567890.123.1234567890123@test>
+Subject: Exported From Confluence
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	boundary="----=_Part_123_456789.123456789"
+
+------=_Part_123_456789.123456789
+Content-Type: text/html; charset=UTF-8
+
+<html><body><h1>Direct Content</h1></body></html>
+------=_Part_123_456789.123456789--
+`
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "no-encoding.doc")
+	if err := os.WriteFile(testFile, []byte(mimeContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	html, err := ExtractHTMLFromMIME(testFile)
+	if err != nil {
+		t.Fatalf("ExtractHTMLFromMIME failed: %v", err)
+	}
+
+	if !strings.Contains(html, "Direct Content") {
+		t.Errorf("Expected HTML content, got: %s", html)
+	}
+}
+
+func TestExtractHTMLFromMIME_MultipleParts(t *testing.T) {
+	// Test MIME with multiple parts (image and HTML)
+	mimeContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+Message-ID: <1234567890.123.1234567890123@test>
+Subject: Exported From Confluence
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	boundary="----=_Part_123_456789.123456789"
+
+------=_Part_123_456789.123456789
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==
+------=_Part_123_456789.123456789
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><body><h1>After Image Part</h1></body></html>
+------=_Part_123_456789.123456789--
+`
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "multi-part.doc")
+	if err := os.WriteFile(testFile, []byte(mimeContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	html, err := ExtractHTMLFromMIME(testFile)
+	if err != nil {
+		t.Fatalf("ExtractHTMLFromMIME failed: %v", err)
+	}
+
+	if !strings.Contains(html, "After Image Part") {
+		t.Errorf("Expected HTML content from second part, got: %s", html)
+	}
+}
+
+func TestIsConfluenceMIME_PartialHeaders(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test file with only Date header (missing MIME-Version and Subject)
+	onlyDateContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+Content-Type: text/plain
+
+Some content
+`
+	onlyDateFile := filepath.Join(tmpDir, "only-date.doc")
+	if err := os.WriteFile(onlyDateFile, []byte(onlyDateContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	isConfluence, err := IsConfluenceMIME(onlyDateFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if isConfluence {
+		t.Error("Expected file with only Date header to return false")
+	}
+
+	// Test file with Date and MIME-Version but missing Confluence subject
+	missingSubjectContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+MIME-Version: 1.0
+Content-Type: text/plain
+
+Some content
+`
+	missingSubjectFile := filepath.Join(tmpDir, "missing-subject.doc")
+	if err := os.WriteFile(missingSubjectFile, []byte(missingSubjectContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	isConfluence, err = IsConfluenceMIME(missingSubjectFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if isConfluence {
+		t.Error("Expected file without Confluence subject to return false")
+	}
+
+	// Test file with Subject but wrong content
+	wrongSubjectContent := `Date: Wed, 7 Jan 2026 01:29:00 +0000 (UTC)
+MIME-Version: 1.0
+Subject: Random Email Subject
+
+Some content
+`
+	wrongSubjectFile := filepath.Join(tmpDir, "wrong-subject.doc")
+	if err := os.WriteFile(wrongSubjectFile, []byte(wrongSubjectContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	isConfluence, err = IsConfluenceMIME(wrongSubjectFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if isConfluence {
+		t.Error("Expected file with wrong subject to return false")
+	}
+}
+

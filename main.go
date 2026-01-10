@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,88 +18,128 @@ var (
 	repoURL = "https://github.com/aqueeb/confluence2md"
 )
 
-func main() {
-	// Define flags
-	outputPath := flag.String("o", "", "Output file path (default: input with .md extension)")
-	outputLong := flag.String("output", "", "Output file path (default: input with .md extension)")
-	dirMode := flag.String("dir", "", "Convert all .doc files in directory")
-	verbose := flag.Bool("v", false, "Verbose output")
-	verboseLong := flag.Bool("verbose", false, "Verbose output")
-	dryRun := flag.Bool("dry-run", false, "Show what would be converted without writing")
-	showVersion := flag.Bool("version", false, "Show version")
+// config holds the parsed command-line configuration
+type config struct {
+	outputPath  string
+	dirMode     string
+	verbose     bool
+	dryRun      bool
+	showVersion bool
+	args        []string
+}
 
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "confluence2md - Convert Confluence MIME exports to Markdown\n\n")
-		fmt.Fprintf(os.Stderr, "Usage:\n")
-		fmt.Fprintf(os.Stderr, "  %s [flags] <input.doc>\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --dir <directory>\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Flags:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s document.doc                    Convert single file\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s document.doc -o output.md       Convert with custom output\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --dir ./docs                    Convert all .doc files in directory\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --dir ./docs --dry-run          Preview conversions\n", os.Args[0])
+// parseFlags parses command-line flags and returns a config.
+// Uses the provided FlagSet to allow testing without affecting global state.
+func parseFlags(args []string, output io.Writer) (*config, error) {
+	fs := flag.NewFlagSet("confluence2md", flag.ContinueOnError)
+	fs.SetOutput(output)
+
+	outputPath := fs.String("o", "", "Output file path (default: input with .md extension)")
+	outputLong := fs.String("output", "", "Output file path (default: input with .md extension)")
+	dirMode := fs.String("dir", "", "Convert all .doc files in directory")
+	verbose := fs.Bool("v", false, "Verbose output")
+	verboseLong := fs.Bool("verbose", false, "Verbose output")
+	dryRun := fs.Bool("dry-run", false, "Show what would be converted without writing")
+	showVersion := fs.Bool("version", false, "Show version")
+
+	fs.Usage = func() {
+		fmt.Fprintf(output, "confluence2md - Convert Confluence MIME exports to Markdown\n\n")
+		fmt.Fprintf(output, "Usage:\n")
+		fmt.Fprintf(output, "  confluence2md [flags] <input.doc>\n")
+		fmt.Fprintf(output, "  confluence2md --dir <directory>\n\n")
+		fmt.Fprintf(output, "Flags:\n")
+		fs.PrintDefaults()
+		fmt.Fprintf(output, "\nExamples:\n")
+		fmt.Fprintf(output, "  confluence2md document.doc                    Convert single file\n")
+		fmt.Fprintf(output, "  confluence2md document.doc -o output.md       Convert with custom output\n")
+		fmt.Fprintf(output, "  confluence2md --dir ./docs                    Convert all .doc files in directory\n")
+		fmt.Fprintf(output, "  confluence2md --dir ./docs --dry-run          Preview conversions\n")
 	}
 
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
 
+	// Merge short and long flag variants
+	outPath := *outputPath
+	if *outputLong != "" && outPath == "" {
+		outPath = *outputLong
+	}
+	isVerbose := *verbose || *verboseLong
+
+	return &config{
+		outputPath:  outPath,
+		dirMode:     *dirMode,
+		verbose:     isVerbose,
+		dryRun:      *dryRun,
+		showVersion: *showVersion,
+		args:        fs.Args(),
+	}, nil
+}
+
+// run executes the main logic and returns an exit code.
+// This function is testable as it doesn't call os.Exit directly.
+func run(cfg *config) int {
 	// Handle version flag
-	if *showVersion {
+	if cfg.showVersion {
 		fmt.Printf("confluence2md %s\n", version)
 		if commit != "none" {
 			fmt.Printf("  commit: %s\n", commit)
 			fmt.Printf("  built:  %s\n", date)
 		}
-		os.Exit(0)
-	}
-
-	// Merge short and long flag variants
-	if *outputLong != "" && *outputPath == "" {
-		outputPath = outputLong
-	}
-	if *verboseLong && !*verbose {
-		verbose = verboseLong
+		return 0
 	}
 
 	// Check pandoc availability
 	if err := converter.CheckPandoc(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// Directory mode
-	if *dirMode != "" {
-		if err := convertDirectory(*dirMode, *verbose, *dryRun); err != nil {
+	if cfg.dirMode != "" {
+		if err := convertDirectory(cfg.dirMode, cfg.verbose, cfg.dryRun); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
-		if !*dryRun {
+		if !cfg.dryRun {
 			printStarPrompt()
 		}
-		return
+		return 0
 	}
 
 	// Single file mode
-	args := flag.Args()
-	if len(args) < 1 {
-		flag.Usage()
-		os.Exit(1)
+	if len(cfg.args) < 1 {
+		fmt.Fprintf(os.Stderr, "confluence2md - Convert Confluence MIME exports to Markdown\n\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  confluence2md [flags] <input.doc>\n")
+		fmt.Fprintf(os.Stderr, "  confluence2md --dir <directory>\n\n")
+		fmt.Fprintf(os.Stderr, "Run 'confluence2md --help' for more information.\n")
+		return 1
 	}
 
-	inputPath := args[0]
-	output := *outputPath
+	inputPath := cfg.args[0]
+	output := cfg.outputPath
 	if output == "" {
 		output = generateOutputPath(inputPath)
 	}
 
-	if err := convertFile(inputPath, output, *verbose, *dryRun); err != nil {
+	if err := convertFile(inputPath, output, cfg.verbose, cfg.dryRun); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
-	if !*dryRun {
+	if !cfg.dryRun {
 		printStarPrompt()
 	}
+	return 0
+}
+
+func main() {
+	cfg, err := parseFlags(os.Args[1:], os.Stderr)
+	if err != nil {
+		os.Exit(1)
+	}
+	os.Exit(run(cfg))
 }
 
 // convertDirectory converts all .doc files in a directory.

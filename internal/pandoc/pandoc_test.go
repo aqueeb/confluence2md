@@ -2,6 +2,8 @@ package pandoc
 
 import (
 	"context"
+	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -172,5 +174,129 @@ func TestGetPath(t *testing.T) {
 	path := GetPath()
 	if path == "" {
 		t.Error("GetPath returned empty string after extraction")
+	}
+}
+
+func TestGetBinaryName(t *testing.T) {
+	name := getBinaryName()
+	if runtime.GOOS == "windows" {
+		if name != "pandoc.exe" {
+			t.Errorf("expected 'pandoc.exe' on Windows, got: %s", name)
+		}
+	} else {
+		if name != "pandoc" {
+			t.Errorf("expected 'pandoc' on non-Windows, got: %s", name)
+		}
+	}
+}
+
+func TestCleanup(t *testing.T) {
+	if !IsEmbedded() {
+		t.Skip("pandoc binary not embedded (run scripts/download-pandoc.sh first)")
+	}
+
+	// Ensure extracted first
+	path, err := EnsureExtracted()
+	if err != nil {
+		t.Fatalf("EnsureExtracted failed: %v", err)
+	}
+
+	// Verify the binary exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Fatal("expected extracted binary to exist")
+	}
+
+	// Run cleanup
+	err = Cleanup()
+	if err != nil {
+		t.Fatalf("Cleanup failed: %v", err)
+	}
+
+	// Verify GetPath returns empty after cleanup
+	if GetPath() != "" {
+		t.Error("GetPath should return empty string after Cleanup")
+	}
+
+	// Re-extract for subsequent tests
+	_, err = EnsureExtracted()
+	if err != nil {
+		t.Fatalf("Re-extraction after cleanup failed: %v", err)
+	}
+}
+
+func TestCleanupWhenNotExtracted(t *testing.T) {
+	// Save current state
+	oldPath := extractedPath
+
+	// Simulate not extracted state
+	extractedPath = ""
+
+	// Cleanup should succeed and do nothing
+	err := Cleanup()
+	if err != nil {
+		t.Errorf("Cleanup when not extracted should not error: %v", err)
+	}
+
+	// Restore state
+	extractedPath = oldPath
+}
+
+func TestConvertWithExtraArgs(t *testing.T) {
+	if !IsEmbedded() {
+		t.Skip("pandoc binary not embedded (run scripts/download-pandoc.sh first)")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Test conversion with multiple extra args
+	input := []byte("<table><tr><td>Cell 1</td><td>Cell 2</td></tr></table>")
+	output, err := Convert(ctx, input, "html", "gfm", "--wrap=none", "--columns=1000")
+	if err != nil {
+		t.Fatalf("Convert with extra args failed: %v", err)
+	}
+
+	result := string(output)
+	if !strings.Contains(result, "Cell 1") || !strings.Contains(result, "Cell 2") {
+		t.Errorf("output doesn't contain expected cells: %s", result)
+	}
+}
+
+func TestRunWithInvalidArgs(t *testing.T) {
+	if !IsEmbedded() {
+		t.Skip("pandoc binary not embedded (run scripts/download-pandoc.sh first)")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Run with help flag (should succeed)
+	output, err := Run(ctx, "--help")
+	if err != nil {
+		t.Fatalf("Run --help failed: %v", err)
+	}
+
+	if !strings.Contains(string(output), "pandoc") {
+		t.Errorf("help output doesn't mention pandoc: %s", string(output))
+	}
+}
+
+func TestEmbeddedSize(t *testing.T) {
+	size := EmbeddedSize()
+	if IsEmbedded() {
+		if size == 0 {
+			t.Error("embedded size should not be 0 when embedded")
+		}
+	}
+}
+
+func TestVersion(t *testing.T) {
+	if Version == "" {
+		t.Error("Version constant should not be empty")
+	}
+	// Version should be a valid semver-like string
+	parts := strings.Split(Version, ".")
+	if len(parts) < 2 {
+		t.Errorf("Version should have at least 2 parts: %s", Version)
 	}
 }
