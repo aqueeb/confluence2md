@@ -64,9 +64,37 @@ func extractBinary() (string, error) {
 		os.Remove(binaryPath)
 	}
 
-	// Write embedded binary
-	if err := os.WriteFile(binaryPath, embeddedBinary, 0755); err != nil {
+	// Write embedded binary to a temp file first, then rename (atomic)
+	// This prevents "text file busy" errors on Linux when the file is
+	// executed while still being written
+	tmpPath := binaryPath + ".tmp"
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	if _, err := f.Write(embeddedBinary); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to write pandoc binary: %w", err)
+	}
+
+	// Sync to ensure all data is written to disk
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to sync pandoc binary: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to close pandoc binary: %w", err)
+	}
+
+	// Atomic rename
+	if err := os.Rename(tmpPath, binaryPath); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to rename pandoc binary: %w", err)
 	}
 
 	// Verify extraction
