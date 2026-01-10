@@ -7,8 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-10
+
 ### Added
-- Comprehensive unit tests for CLI functions (`main_test.go`)
+- Comprehensive unit tests for CLI functions (`main_test.go` with 15 tests)
+- CHANGELOG.md for version history tracking
+- SECURITY.md with vulnerability reporting guidelines
+- CODE_OF_CONDUCT.md (Contributor Covenant)
+- GitHub issue templates (bug report, feature request)
+- Pull request template
+- CodeQL security scanning workflow
+- Test coverage reporting with Codecov
+- golangci-lint integration in CI
+
+### Changed
+- `IsConfluenceMIME()` now returns `(bool, error)` for proper error handling
+- Extracted HTML entity replacements to shared `htmlEntityMap`
+- Added named constants for magic numbers (`pandocTimeout`, `maxASCIICodePoint`, `mimeHeaderScanLimit`)
+- Improved documentation with regex pattern comments
+- Replaced `fmt.Sscanf` with `strconv.ParseInt` for proper error handling
 
 ### Fixed
 - Replaced custom `contains()` helper with `strings.Contains()` in tests
@@ -70,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TOC cleanup
   - HTML entity decoding
 
-[Unreleased]: https://github.com/aqueeb/confluence2md/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/aqueeb/confluence2md/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/aqueeb/confluence2md/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/aqueeb/confluence2md/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/aqueeb/confluence2md/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/aqueeb/confluence2md/compare/v0.2.1...v0.2.2
