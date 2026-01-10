@@ -835,6 +835,21 @@ func TestBalanceDetailsTags_EdgeCases(t *testing.T) {
 			input:  "<details>Content</details></details>More text</details>",
 			expect: "<details>Content</details>More text",
 		},
+		{
+			name:   "removal creates new tag from surrounding chars",
+			input:  "<</details>/details>",
+			expect: "", // First removal creates "</details>", second removal clears it
+		},
+		{
+			name:   "multiple removals create new tags",
+			input:  "<</details>/details></details>",
+			expect: "", // All orphaned closing tags are removed
+		},
+		{
+			name:   "preserves content around removed tags",
+			input:  "Hello</details>World",
+			expect: "HelloWorld",
+		},
 	}
 
 	for _, tt := range tests {

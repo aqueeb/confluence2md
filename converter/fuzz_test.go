@@ -257,8 +257,12 @@ func FuzzPostProcessMarkdown(f *testing.F) {
 			t.Errorf("Result size %d is much larger than input size %d", len(result), len(input))
 		}
 
-		// Note: We don't check details tag balance due to known edge case bug
-		// in balanceDetailsTags (see FuzzBalanceDetailsTags comment)
+		// Invariant: details tags should be balanced in output
+		openCount := strings.Count(result, "<details>")
+		closeCount := strings.Count(result, "</details>")
+		if closeCount > openCount {
+			t.Errorf("More closing </details> tags (%d) than opening (%d)", closeCount, openCount)
+		}
 	})
 }
 
@@ -370,9 +374,9 @@ func FuzzDecodeHTMLEntities(f *testing.F) {
 }
 
 // FuzzBalanceDetailsTags tests the details tag balancing function.
-// NOTE: This fuzz test discovered a bug where removing a </details> tag can
-// accidentally create a new one from surrounding characters (e.g., "<</details>/details>"
-// becomes "</details>" after removing the first tag). This is a real but rare edge case.
+// NOTE: This fuzz test originally discovered a bug where removing a </details> tag
+// could accidentally create a new one from surrounding characters. The bug was fixed
+// by recounting tags after each removal instead of just decrementing a counter.
 func FuzzBalanceDetailsTags(f *testing.F) {
 	seeds := []string{
 		// Balanced
@@ -427,8 +431,13 @@ func FuzzBalanceDetailsTags(f *testing.F) {
 			t.Errorf("Result length %d exceeds input length %d", len(result), len(input))
 		}
 
-		// Note: We don't check that closing <= opening because of the known bug
-		// where removing a tag can accidentally form a new one from surrounding chars
+		// Invariant: closing tags should not exceed opening tags in output
+		// (this was previously disabled due to a bug, now fixed)
+		openCount := strings.Count(result, "<details>")
+		closeCount := strings.Count(result, "</details>")
+		if closeCount > openCount {
+			t.Errorf("Result has more </details> (%d) than <details> (%d)", closeCount, openCount)
+		}
 	})
 }
 

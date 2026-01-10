@@ -528,17 +528,21 @@ func postProcessMarkdown(md string) string {
 
 // balanceDetailsTags removes orphaned </details> tags that don't have matching opening tags.
 func balanceDetailsTags(md string) string {
-	openCount := strings.Count(md, "<details>")
-	closeCount := strings.Count(md, "</details>")
+	// Remove excess closing tags from the end, recounting after each removal
+	// to handle edge cases where removal creates new tags from surrounding chars
+	for {
+		openCount := strings.Count(md, "<details>")
+		closeCount := strings.Count(md, "</details>")
 
-	// Remove excess closing tags from the end
-	for closeCount > openCount {
+		if closeCount <= openCount {
+			break
+		}
+
 		lastIdx := strings.LastIndex(md, "</details>")
 		if lastIdx == -1 {
 			break
 		}
 		md = md[:lastIdx] + md[lastIdx+len("</details>"):]
-		closeCount--
 	}
 
 	return md
