@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Version is the embedded Pandoc version
@@ -59,17 +60,36 @@ func extractBinary() (string, error) {
 			if err := verifyExecutable(binaryPath); err == nil {
 				return binaryPath, nil
 			}
+			// Verification failed (might be "text file busy"), wait and retry
+			for i := 0; i < 5; i++ {
+				// Small delay to let other process finish writing
+				time.Sleep(100 * time.Millisecond)
+				if err := verifyExecutable(binaryPath); err == nil {
+					return binaryPath, nil
+				}
+			}
 		}
-		// Size mismatch or not executable, remove and re-extract
-		os.Remove(binaryPath)
+		// Size mismatch or verification failed, don't remove - another process
+		// might be writing it. Just try to extract with our own temp file.
 	}
 
 	// Write embedded binary to a temp file first, then rename (atomic)
 	// This prevents "text file busy" errors on Linux when the file is
-	// executed while still being written
-	tmpPath := binaryPath + ".tmp"
+	// executed while still being written.
+	//
+	// Use a unique temp file name to handle concurrent extraction from
+	// multiple test binaries (each package runs as a separate binary).
+	tmpPath := fmt.Sprintf("%s.tmp.%d", binaryPath, os.Getpid())
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
+		// Another process might have already extracted, check if target exists
+		if info, statErr := os.Stat(binaryPath); statErr == nil {
+			if info.Size() == int64(len(embeddedBinary)) {
+				if verifyErr := verifyExecutable(binaryPath); verifyErr == nil {
+					return binaryPath, nil
+				}
+			}
+		}
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
 
@@ -91,9 +111,17 @@ func extractBinary() (string, error) {
 		return "", fmt.Errorf("failed to close pandoc binary: %w", err)
 	}
 
-	// Atomic rename
+	// Atomic rename - if this fails, another process might have already done it
 	if err := os.Rename(tmpPath, binaryPath); err != nil {
 		os.Remove(tmpPath)
+		// Check if target was created by another process
+		if info, statErr := os.Stat(binaryPath); statErr == nil {
+			if info.Size() == int64(len(embeddedBinary)) {
+				if verifyErr := verifyExecutable(binaryPath); verifyErr == nil {
+					return binaryPath, nil
+				}
+			}
+		}
 		return "", fmt.Errorf("failed to rename pandoc binary: %w", err)
 	}
 
