@@ -12,6 +12,13 @@ import (
 	"strings"
 )
 
+const (
+	// mimeHeaderScanLimit is the maximum number of lines to scan when
+	// checking if a file is a Confluence MIME export. The required headers
+	// (Date, MIME-Version, Subject) typically appear in the first few lines.
+	mimeHeaderScanLimit = 10
+)
+
 // ExtractHTMLFromMIME reads a MIME-encoded Confluence export file and extracts the HTML content.
 func ExtractHTMLFromMIME(filepath string) (string, error) {
 	file, err := os.Open(filepath)
@@ -78,10 +85,13 @@ func ExtractHTMLFromMIME(filepath string) (string, error) {
 }
 
 // IsConfluenceMIME checks if a file appears to be a MIME-encoded Confluence export.
-func IsConfluenceMIME(filepath string) bool {
+// Returns (true, nil) if the file is a valid Confluence MIME export,
+// (false, nil) if the file can be read but is not a Confluence export,
+// and (false, error) if there was an error reading the file.
+func IsConfluenceMIME(filepath string) (bool, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
@@ -91,7 +101,7 @@ func IsConfluenceMIME(filepath string) bool {
 	hasMIMEVersion := false
 	hasConfluenceSubject := false
 
-	for scanner.Scan() && lineCount < 10 {
+	for scanner.Scan() && lineCount < mimeHeaderScanLimit {
 		line := scanner.Text()
 		lineCount++
 
@@ -106,5 +116,9 @@ func IsConfluenceMIME(filepath string) bool {
 		}
 	}
 
-	return hasDateHeader && hasMIMEVersion && hasConfluenceSubject
+	if err := scanner.Err(); err != nil {
+		return false, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return hasDateHeader && hasMIMEVersion && hasConfluenceSubject, nil
 }

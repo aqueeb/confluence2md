@@ -117,7 +117,14 @@ func convertDirectory(dir string, verbose, dryRun bool) error {
 	// Filter to only Confluence MIME files
 	var confluenceFiles []string
 	for _, match := range matches {
-		if converter.IsConfluenceMIME(match) {
+		isConfluence, err := converter.IsConfluenceMIME(match)
+		if err != nil {
+			if verbose {
+				fmt.Printf("Skipping (error reading file): %s: %v\n", match, err)
+			}
+			continue
+		}
+		if isConfluence {
 			confluenceFiles = append(confluenceFiles, match)
 		} else if verbose {
 			fmt.Printf("Skipping (not Confluence MIME): %s\n", match)
@@ -162,7 +169,11 @@ func convertFile(inputPath, outputPath string, verbose, dryRun bool) error {
 	}
 
 	// Verify it's a Confluence MIME export
-	if !converter.IsConfluenceMIME(inputPath) {
+	isConfluence, err := converter.IsConfluenceMIME(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to check file format: %w", err)
+	}
+	if !isConfluence {
 		return fmt.Errorf("file does not appear to be a Confluence MIME export: %s", inputPath)
 	}
 

@@ -3,6 +3,7 @@ package converter
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -29,7 +30,11 @@ Content-Transfer-Encoding: quoted-printable
 	}
 
 	// Test valid Confluence MIME
-	if !IsConfluenceMIME(validFile) {
+	isConfluence, err := IsConfluenceMIME(validFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if !isConfluence {
 		t.Error("Expected valid Confluence MIME file to return true")
 	}
 
@@ -43,12 +48,20 @@ Not a MIME message at all.
 	}
 
 	// Test invalid file
-	if IsConfluenceMIME(invalidFile) {
+	isConfluence, err = IsConfluenceMIME(invalidFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if isConfluence {
 		t.Error("Expected invalid file to return false")
 	}
 
-	// Test non-existent file
-	if IsConfluenceMIME("/nonexistent/file.doc") {
+	// Test non-existent file (should return error)
+	isConfluence, err = IsConfluenceMIME("/nonexistent/file.doc")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+	if isConfluence {
 		t.Error("Expected non-existent file to return false")
 	}
 }
@@ -85,7 +98,7 @@ Content-Transfer-Encoding: quoted-printable
 	if html == "" {
 		t.Error("Expected non-empty HTML content")
 	}
-	if !contains(html, "<h1>Hello World</h1>") {
+	if !strings.Contains(html, "<h1>Hello World</h1>") {
 		t.Errorf("Expected HTML to contain '<h1>Hello World</h1>', got: %s", html)
 	}
 }
@@ -119,7 +132,7 @@ Content-Transfer-Encoding: quoted-printable
 	}
 
 	// Verify quoted-printable was decoded (=3D should become =)
-	if !contains(html, "Test = Value") {
+	if !strings.Contains(html, "Test = Value") {
 		t.Errorf("Expected decoded '=' in HTML, got: %s", html)
 	}
 }
@@ -157,15 +170,3 @@ Just plain text, no HTML
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

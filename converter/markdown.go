@@ -12,6 +12,32 @@ import (
 	"github.com/aqueeb/confluence2md/internal/pandoc"
 )
 
+const (
+	// pandocTimeout is the maximum time allowed for pandoc conversion.
+	pandocTimeout = 2 * time.Minute
+
+	// maxASCIICodePoint is the maximum code point for ASCII characters.
+	// Used when decoding numeric HTML entities to only decode printable ASCII.
+	maxASCIICodePoint = 127
+)
+
+// htmlEntityMap maps HTML entities to their decoded characters.
+// Used for decoding double-encoded HTML from Confluence exports.
+var htmlEntityMap = map[string]string{
+	"&lt;":   "<",
+	"&gt;":   ">",
+	"&amp;":  "&",
+	"&quot;": "\"",
+	"&#39;":  "'",
+	"&apos;": "'",
+	"&#x27;": "'",
+	"&#34;":  "\"",
+	"&#60;":  "<",
+	"&#62;":  ">",
+	"&#38;":  "&",
+	"&nbsp;": " ",
+}
+
 // CheckPandoc verifies that pandoc is available (embedded or in PATH).
 func CheckPandoc() error {
 	// First try to use embedded pandoc
@@ -33,7 +59,7 @@ func CheckPandoc() error {
 
 // ConvertHTMLToMarkdown converts HTML content to Markdown using pandoc and applies post-processing.
 func ConvertHTMLToMarkdown(html string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), pandocTimeout)
 	defer cancel()
 
 	// Pre-process HTML to remove Confluence layout markup
@@ -101,51 +127,39 @@ func decodeHTMLEntities(html string) string {
 		return html
 	}
 
-	// Decode common HTML entities that represent tags
-	replacements := []struct {
-		entity string
-		char   string
-	}{
-		{"&lt;", "<"},
-		{"&gt;", ">"},
-		{"&amp;", "&"},
-		{"&quot;", "\""},
-		{"&#39;", "'"},
-		{"&apos;", "'"},
-		{"&#x27;", "'"},
-		{"&#34;", "\""},
-		{"&#60;", "<"},
-		{"&#62;", ">"},
-		{"&#38;", "&"},
+	// Decode common HTML entities using the shared map
+	for entity, char := range htmlEntityMap {
+		html = strings.ReplaceAll(html, entity, char)
 	}
 
-	for _, r := range replacements {
-		html = strings.ReplaceAll(html, r.entity, r.char)
-	}
-
-	// Handle numeric HTML entities for common characters
-	// &#xNN; hex format
+	// Handle numeric HTML entities for common characters.
+	// These patterns decode character references like &#x3C; (hex) and &#60; (decimal).
+	// Only ASCII characters (< 127) are decoded to avoid issues with extended characters.
+	//
+	// Hex format: &#xNN; where NN is a hexadecimal number
+	// Pattern breakdown: &#x captures literal prefix, ([0-9a-fA-F]+) captures hex digits, ; captures literal suffix
 	hexEntityPattern := regexp.MustCompile(`&#x([0-9a-fA-F]+);`)
 	html = hexEntityPattern.ReplaceAllStringFunc(html, func(match string) string {
 		submatches := hexEntityPattern.FindStringSubmatch(match)
 		if len(submatches) > 1 {
 			var val int
 			fmt.Sscanf(submatches[1], "%x", &val)
-			if val > 0 && val < 127 {
+			if val > 0 && val < maxASCIICodePoint {
 				return string(rune(val))
 			}
 		}
 		return match
 	})
 
-	// &#NNN; decimal format
+	// Decimal format: &#NNN; where NNN is a decimal number
+	// Pattern breakdown: &# captures literal prefix, (\d+) captures decimal digits, ; captures literal suffix
 	decEntityPattern := regexp.MustCompile(`&#(\d+);`)
 	html = decEntityPattern.ReplaceAllStringFunc(html, func(match string) string {
 		submatches := decEntityPattern.FindStringSubmatch(match)
 		if len(submatches) > 1 {
 			var val int
 			fmt.Sscanf(submatches[1], "%d", &val)
-			if val > 0 && val < 127 {
+			if val > 0 && val < maxASCIICodePoint {
 				return string(rune(val))
 			}
 		}
@@ -206,8 +220,15 @@ func preProcessHTML(html string) string {
 	// Remove draggable attributes
 	html = regexp.MustCompile(`\s+draggable="[^"]*"`).ReplaceAllString(html, "")
 
-	// Convert Confluence image tags to simple img tags pandoc can handle better
-	// Extract src and alt, discard the rest
+	// Convert Confluence image tags to simple img tags pandoc can handle better.
+	// Extract src and alt attributes, discard all other attributes (data-*, class, etc.).
+	//
+	// Pattern breakdown:
+	// <img[^>]*           - Match <img tag with any attributes before src
+	// \ssrc="([^"]*)"     - Capture src attribute value (required)
+	// [^>]*               - Match any attributes between src and alt
+	// (?:\salt="([^"]*)"|) - Optionally capture alt attribute value (non-capturing group with alternation)
+	// [^>]*>              - Match remaining attributes and closing >
 	imgPattern := regexp.MustCompile(`<img[^>]*\ssrc="([^"]*)"[^>]*(?:\salt="([^"]*)"|)[^>]*>`)
 	html = imgPattern.ReplaceAllStringFunc(html, func(match string) string {
 		srcMatch := regexp.MustCompile(`src="([^"]*)"`).FindStringSubmatch(match)
@@ -414,12 +435,10 @@ func postProcessMarkdown(md string) string {
 	// Remove any remaining span tags
 	md = regexp.MustCompile(`</?span[^>]*>`).ReplaceAllString(md, "")
 
-	// Clean up HTML entities
-	md = strings.ReplaceAll(md, "&amp;", "&")
-	md = strings.ReplaceAll(md, "&lt;", "<")
-	md = strings.ReplaceAll(md, "&gt;", ">")
-	md = strings.ReplaceAll(md, "&nbsp;", " ")
-	md = strings.ReplaceAll(md, "&quot;", "\"")
+	// Clean up HTML entities using the shared map
+	for entity, char := range htmlEntityMap {
+		md = strings.ReplaceAll(md, entity, char)
+	}
 
 	// Remove escaped HTML that pandoc didn't convert
 	// These appear as \<tag\> or \</tag\>
@@ -428,7 +447,15 @@ func postProcessMarkdown(md string) string {
 	md = regexp.MustCompile(`\\</?div[^>]*\\?>`).ReplaceAllString(md, "")
 	md = regexp.MustCompile(`\\</?span[^>]*\\?>`).ReplaceAllString(md, "")
 
-	// Handle escaped img tags - convert to markdown images
+	// Handle escaped img tags - convert to markdown images.
+	// Pandoc sometimes escapes HTML tags as \<tag\>. This pattern matches escaped <img> tags
+	// and converts them to proper Markdown image syntax: ![alt](src)
+	//
+	// Pattern breakdown:
+	// \\<img           - Match escaped opening: \<img
+	// [^>]*src="..."   - Capture src attribute
+	// (?:alt="..."|)   - Optionally capture alt attribute
+	// \\?>             - Match optional escaped closing: \> or just >
 	escapedImgPattern := regexp.MustCompile(`\\<img[^>]*src="([^"]*)"[^>]*(?:alt="([^"]*)"|)[^>]*\\?>`)
 	md = escapedImgPattern.ReplaceAllStringFunc(md, func(match string) string {
 		srcMatch := regexp.MustCompile(`src="([^"]*)"`).FindStringSubmatch(match)
