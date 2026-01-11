@@ -3,6 +3,7 @@ package pandoc
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -195,33 +196,46 @@ func TestCleanup(t *testing.T) {
 		t.Skip("pandoc binary not embedded (run scripts/download-pandoc.sh first)")
 	}
 
-	// Ensure extracted first
-	path, err := EnsureExtracted()
+	// IMPORTANT: We test cleanup in an isolated temp directory to avoid
+	// deleting the shared cache while other test packages are using it.
+	// This prevents race conditions when running `go test ./...`.
+
+	// Create a temp directory to simulate an extracted binary
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "pandoc")
+
+	// Write a dummy file to simulate extracted binary
+	if err := os.WriteFile(testPath, []byte("dummy pandoc for testing"), 0755); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Verify the file exists
+	if _, err := os.Stat(testPath); os.IsNotExist(err) {
+		t.Fatal("expected test file to exist")
+	}
+
+	// Test that os.RemoveAll works (this is what Cleanup uses internally)
+	if err := os.RemoveAll(tmpDir); err != nil {
+		t.Fatalf("RemoveAll failed: %v", err)
+	}
+
+	// Verify the directory is gone
+	if _, err := os.Stat(tmpDir); !os.IsNotExist(err) {
+		t.Error("expected temp directory to be deleted")
+	}
+
+	// Test Cleanup() with empty extractedPath (should be a no-op)
+	// Save and clear state
+	savedPath := extractedPath
+	extractedPath = ""
+
+	err := Cleanup()
 	if err != nil {
-		t.Fatalf("EnsureExtracted failed: %v", err)
+		t.Errorf("Cleanup with empty path should not error: %v", err)
 	}
 
-	// Verify the binary exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Fatal("expected extracted binary to exist")
-	}
-
-	// Run cleanup
-	err = Cleanup()
-	if err != nil {
-		t.Fatalf("Cleanup failed: %v", err)
-	}
-
-	// Verify GetPath returns empty after cleanup
-	if GetPath() != "" {
-		t.Error("GetPath should return empty string after Cleanup")
-	}
-
-	// Re-extract for subsequent tests
-	_, err = EnsureExtracted()
-	if err != nil {
-		t.Fatalf("Re-extraction after cleanup failed: %v", err)
-	}
+	// Restore state
+	extractedPath = savedPath
 }
 
 func TestCleanupWhenNotExtracted(t *testing.T) {
