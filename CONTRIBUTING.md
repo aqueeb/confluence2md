@@ -36,6 +36,49 @@ go test ./... -v
 4. Run `go fmt ./...` to format code
 5. Commit with a clear message
 
+## Commit Message Conventions
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/) for clear, consistent history.
+
+### Format
+
+```
+<type>: <description>
+
+[optional body]
+```
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `test` | Adding or updating tests |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `chore` | Build process, CI, or auxiliary tool changes |
+| `perf` | Performance improvement |
+
+### Examples
+
+```
+feat: Add --output-dir flag for custom output location
+fix: Handle empty MIME boundaries gracefully
+docs: Add troubleshooting section to README
+test: Add fuzz tests for MIME parser
+refactor: Extract HTML cleaning into separate function
+chore: Update golangci-lint to v1.55
+```
+
+### Guidelines
+
+- Use lowercase for the description
+- Don't end the description with a period
+- Use imperative mood ("Add feature" not "Added feature")
+- Keep the first line under 72 characters
+- Reference issues when applicable: `fix: Handle edge case (#42)`
+
 ## Pull Requests
 
 - Keep PRs focused on a single change
