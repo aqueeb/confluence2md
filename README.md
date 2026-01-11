@@ -14,9 +14,22 @@
 
 A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 
+## The Problem
+
+Confluence's "Export to Word" feature doesn't create real Word documents—it creates **MIME-encoded HTML files** with a `.doc` extension. Only Microsoft Word can open them. This has been [a known issue for over 10 years](https://community.atlassian.com/forums/Confluence-questions/Why-is-confluence-cloud-s-export-to-Word-feature-creating-an/qaq-p/2325894).
+
+**What doesn't work:**
+- LibreOffice, Google Docs, and other word processors
+- Programmatic document parsers (python-docx, mammoth, etc.)
+- Any tool expecting a real `.doc` or `.docx` file
+
+**Why this matters:**
+You can't convert Confluence exports to Markdown for version control, static site generators, or LLM/RAG pipelines—until now.
+
 ## Features
 
 - **Zero dependencies** - release binaries include embedded pandoc
+- **LLM/RAG-ready output** - clean Markdown optimized for chunking and embedding
 - Parses MIME-encoded Confluence exports (not binary `.doc` files)
 - Uses pandoc for high-quality HTML-to-Markdown conversion
 - Cleans up Confluence-specific HTML artifacts
@@ -24,6 +37,13 @@ A CLI tool to convert Confluence MIME-encoded `.doc` exports to clean Markdown.
 - Converts info/tip/warning boxes to blockquotes
 - Handles collapsible sections, code blocks, and tables
 - Batch convert entire directories
+
+## Use Cases
+
+- **Migrate to Git-based docs** — Move Confluence content to GitBook, Docusaurus, MkDocs, or any static site generator
+- **Build RAG/LLM knowledge bases** — Feed your Confluence docs to LangChain, LlamaIndex, or custom embedding pipelines
+- **Create portable backups** — Store documentation in a format that doesn't require Confluence or MS Word to read
+- **Power AI coding assistants** — Add your team's documentation context to Copilot, Cursor, or Claude
 
 ## Installation
 
