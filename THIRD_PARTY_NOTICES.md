@@ -25,8 +25,12 @@ with confluence2md. This constitutes "mere aggregation" under GPL section 2.
 Complete source code for the bundled Pandoc version is available at:
 https://github.com/jgm/pandoc/releases/tag/3.6.4
 
-You may also obtain source code by writing to:
-John MacFarlane, jgm@berkeley.edu
+For questions about Pandoc licensing or source code, see the
+[Pandoc GitHub repository](https://github.com/jgm/pandoc) or the
+[pandoc-discuss mailing list](https://groups.google.com/g/pandoc-discuss).
+
+We will provide a copy of the Pandoc source code upon request for three years
+from the date of distribution, in accordance with GPL Section 3(b).
 
 ---
 
