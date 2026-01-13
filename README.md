@@ -137,27 +137,3 @@ execution (not linked).
 
 For complete third-party licensing information, see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Enterprise Support
-
-confluence2md is **free and open source software**. You may use it for any
-purpose, including commercial use and enterprise evaluation/proof-of-concept
-deployments, under the Apache 2.0 license.
-
-For organizations requiring additional support, we offer enterprise packages:
-
-- **Priority Support:** Guaranteed response times and dedicated assistance
-- **Custom Development:** Feature development and integration consulting
-- **Training:** Team onboarding and best practices workshops
-- **Compliance:** Documentation, attestations, and audit support (SOC2, etc.)
-- **Extended Maintenance:** Long-term security patches and stability guarantees
-
-Enterprise support helps fund continued development while ensuring your
-organization has the resources needed for production deployments.
-
-**Contact:** aqueeb@users.noreply.github.com
-
----
-
-*Note: Enterprise support is entirely optional. The open source version is
-fully functional with no artificial limitations.*
