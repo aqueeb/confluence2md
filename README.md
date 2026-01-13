@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://goreportcard.com/report/github.com/aqueeb/confluence2md"><img src="https://goreportcard.com/badge/github.com/aqueeb/confluence2md?v=2" alt="Go Report Card"></a>
   <a href="https://codecov.io/gh/aqueeb/confluence2md"><img src="https://codecov.io/gh/aqueeb/confluence2md/branch/main/graph/badge.svg?token=unused" alt="Coverage"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Dual%20(Non--Commercial%20Free)-blue.svg" alt="License: Dual"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="https://github.com/aqueeb/confluence2md/releases"><img src="https://img.shields.io/github/v/release/aqueeb/confluence2md" alt="Release"></a>
   <a href="https://buymeacoffee.com/aqueeb"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buymeacoffee" alt="Buy Me A Coffee"></a>
 </p>
@@ -126,4 +126,38 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## License
 
-**Dual License** — Free for non-commercial use. Commercial use requires a paid license. See [LICENSE](LICENSE) for details.
+confluence2md is licensed under the [Apache License 2.0](LICENSE).
+
+### Third-Party Components
+
+This software bundles [Pandoc](https://pandoc.org/), a universal document
+converter licensed under the GNU General Public License v2.0 or later.
+Pandoc is distributed as a separate executable and invoked via process
+execution (not linked).
+
+For complete third-party licensing information, see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Enterprise Support
+
+confluence2md is **free and open source software**. You may use it for any
+purpose, including commercial use and enterprise evaluation/proof-of-concept
+deployments, under the Apache 2.0 license.
+
+For organizations requiring additional support, we offer enterprise packages:
+
+- **Priority Support:** Guaranteed response times and dedicated assistance
+- **Custom Development:** Feature development and integration consulting
+- **Training:** Team onboarding and best practices workshops
+- **Compliance:** Documentation, attestations, and audit support (SOC2, etc.)
+- **Extended Maintenance:** Long-term security patches and stability guarantees
+
+Enterprise support helps fund continued development while ensuring your
+organization has the resources needed for production deployments.
+
+**Contact:** aqueeb@users.noreply.github.com
+
+---
+
+*Note: Enterprise support is entirely optional. The open source version is
+fully functional with no artificial limitations.*

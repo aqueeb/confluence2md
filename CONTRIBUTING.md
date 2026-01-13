@@ -102,6 +102,55 @@ When reporting bugs, please include:
 - Keep functions focused and small
 - Add comments for non-obvious logic
 
+## Developer Certificate of Origin (DCO)
+
+This project uses the [Developer Certificate of Origin](https://developercertificate.org/)
+to ensure contributions are properly licensed. By contributing, you certify that you have
+the right to submit your contribution under the Apache 2.0 license.
+
+### Signing Your Commits
+
+Add the `-s` flag when committing:
+
+```bash
+git commit -s -m "feat: Add new feature"
+```
+
+This adds a `Signed-off-by` line to your commit message:
+
+```
+feat: Add new feature
+
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+### Git Configuration
+
+Ensure your Git config matches your GitHub account:
+
+```bash
+git config user.name "Your Name"
+git config user.email "your.email@example.com"
+```
+
+### Fixing Unsigned Commits
+
+If you forgot to sign a commit, amend it:
+
+```bash
+git commit --amend -s --no-edit
+git push --force-with-lease
+```
+
+For multiple unsigned commits, use interactive rebase:
+
+```bash
+git rebase -i HEAD~N  # where N is the number of commits
+# Mark commits as "edit", then for each:
+git commit --amend -s --no-edit
+git rebase --continue
+```
+
 ## Questions?
 
 Open an issue with your question — happy to help!

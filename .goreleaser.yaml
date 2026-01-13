@@ -38,6 +38,12 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - LICENSE
+      - NOTICE
+      - THIRD_PARTY_NOTICES.md
+      - THIRD_PARTY_LICENSES/*
+      - README.md
 
 checksum:
   name_template: "checksums.txt"
