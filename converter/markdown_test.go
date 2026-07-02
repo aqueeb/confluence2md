@@ -916,6 +916,109 @@ func TestPreProcessHTML_ComplexTable(t *testing.T) {
 	}
 }
 
+func TestPreProcessHTML_TableCellUnorderedList(t *testing.T) {
+	// Regression test for issue #6: a bullet list inside a table cell used to
+	// make pandoc emit the whole table as raw HTML. The list must be flattened
+	// to inline, sentinel-separated "• item" segments so pandoc keeps a table.
+	input := `<table><tbody><tr><th><p>title 1</p></th><th><p>title 2</p></th></tr>` +
+		`<tr><td><p>left side:</p><ul><li><p>foo</p></li><li><p>bar</p></li></ul></td>` +
+		`<td><p>right side</p></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	// No list markup should survive into pandoc.
+	if strings.Contains(result, "<ul") || strings.Contains(result, "<li") {
+		t.Errorf("Expected list tags to be removed from cell, got: %s", result)
+	}
+	// Items should be flattened to inline bullets, joined by the sentinel.
+	want := "left side:" + cellLineBreakSentinel + "• foo" + cellLineBreakSentinel + "• bar"
+	if !strings.Contains(result, want) {
+		t.Errorf("Expected flattened cell %q, got: %s", want, result)
+	}
+	// Unrelated cell content must be preserved.
+	if !strings.Contains(result, "right side") {
+		t.Errorf("Expected other cell content to be preserved, got: %s", result)
+	}
+}
+
+func TestPreProcessHTML_TableCellOrderedList(t *testing.T) {
+	input := `<table><tbody><tr><td><p>steps:</p><ol><li>one</li><li>two</li><li>three</li></ol></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if strings.Contains(result, "<ol") || strings.Contains(result, "<li") {
+		t.Errorf("Expected ordered list tags to be removed, got: %s", result)
+	}
+	want := "steps:" + cellLineBreakSentinel + "1. one" + cellLineBreakSentinel + "2. two" + cellLineBreakSentinel + "3. three"
+	if !strings.Contains(result, want) {
+		t.Errorf("Expected numbered cell %q, got: %s", want, result)
+	}
+}
+
+func TestPreProcessHTML_TableCellPlainParagraphsUnchanged(t *testing.T) {
+	// Cells without lists must keep the existing space-joined behavior and must
+	// not gain any sentinel line breaks.
+	input := `<table><tbody><tr><td><p>alpha</p><p>beta</p></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if strings.Contains(result, cellLineBreakSentinel) {
+		t.Errorf("Expected no sentinel in a list-free cell, got: %s", result)
+	}
+	if !strings.Contains(result, "<td>alpha beta</td>") {
+		t.Errorf("Expected space-joined paragraphs, got: %s", result)
+	}
+}
+
+func TestPostProcessMarkdown_CellLineBreakSentinel(t *testing.T) {
+	input := "| left side:" + cellLineBreakSentinel + "• foo" + cellLineBreakSentinel + "• bar | right side |"
+
+	result := postProcessMarkdown(input)
+
+	if strings.Contains(result, cellLineBreakSentinel) {
+		t.Errorf("Expected sentinel to be replaced, got: %s", result)
+	}
+	if !strings.Contains(result, "left side:<br>• foo<br>• bar") {
+		t.Errorf("Expected sentinel converted to <br>, got: %s", result)
+	}
+}
+
+func TestConvertHTMLToMarkdown_TableWithListCell(t *testing.T) {
+	// End-to-end regression for issue #6: the exact table shape from the report
+	// must convert to a Markdown pipe table, not a raw HTML <table> block.
+	if err := CheckPandoc(); err != nil {
+		t.Skipf("Pandoc not installed, skipping test: %v", err)
+	}
+
+	html := `<html><body><h1>testpage</h1>
+<table class="confluenceTable">
+<tbody>
+<tr><th class="confluenceTh"><p><strong>title 1</strong></p></th><th class="confluenceTh"><p><strong>title 2</strong></p></th></tr>
+<tr><td class="confluenceTd"><p>left side:</p><ul><li><p>foo</p></li><li><p>bar</p></li></ul></td><td class="confluenceTd"><p>right side</p></td></tr>
+</tbody>
+</table>
+</body></html>`
+
+	md, err := ConvertHTMLToMarkdown(html)
+	if err != nil {
+		t.Fatalf("ConvertHTMLToMarkdown failed: %v", err)
+	}
+
+	// Must be a Markdown pipe table, not raw HTML.
+	if strings.Contains(md, "<table") || strings.Contains(md, "<ul") {
+		t.Errorf("Expected a Markdown table (no raw HTML), got: %s", md)
+	}
+	for _, want := range []string{"| **title 1**", "**title 2**", "• foo", "• bar", "right side"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("Expected converted markdown to contain %q, got: %s", want, md)
+		}
+	}
+	// The flattened list should render as line-broken bullets inside the cell.
+	if !strings.Contains(md, "left side:<br>• foo<br>• bar") {
+		t.Errorf("Expected line-broken bullet cell, got: %s", md)
+	}
+}
+
 func TestPostProcessMarkdown_AllEmojis(t *testing.T) {
 	// Test all text emoji shortcodes defined in the textEmojis map
 	tests := []struct {
