@@ -62,6 +62,10 @@ var (
 	cellParagraphOpenPattern = regexp.MustCompile(`<p[^>]*>`)
 	cellBreakPattern         = regexp.MustCompile(`<br\s*/?>`)
 	whitespaceRunPattern     = regexp.MustCompile(`\s+`)
+
+	// Patterns for promoting a table's header row (see promoteTableHeaderRows).
+	tableBlockPattern = regexp.MustCompile(`(?is)<table>.*?</table>`)
+	tableRowPattern   = regexp.MustCompile(`(?is)<tr>.*?</tr>`)
 )
 
 // CheckPandoc verifies that pandoc is available (embedded or in PATH).
@@ -288,7 +292,8 @@ func preProcessHTML(html string) string {
 	html = regexp.MustCompile(`<thead[^>]*>`).ReplaceAllString(html, "<thead>")
 	html = regexp.MustCompile(`<tbody[^>]*>`).ReplaceAllString(html, "<tbody>")
 	html = regexp.MustCompile(`<tr[^>]*>`).ReplaceAllString(html, "<tr>")
-	html = regexp.MustCompile(`<th[^>]*>`).ReplaceAllString(html, "<th>")
+	// Match <th> and <th ...> but NOT <thead>, which shares the "<th" prefix.
+	html = regexp.MustCompile(`<th(?:\s[^>]*)?>`).ReplaceAllString(html, "<th>")
 	html = regexp.MustCompile(`<td[^>]*>`).ReplaceAllString(html, "<td>")
 
 	// Remove <br> tags inside table cells (pandoc can't handle them and falls back to HTML)
@@ -333,6 +338,10 @@ func preProcessHTML(html string) string {
 		}
 		return "<td>" + inner + "</td>"
 	})
+
+	// Promote header rows so pandoc emits a real Markdown table header instead of
+	// an empty one (Confluence puts <th> cells inside <tbody> with no <thead>).
+	html = promoteTableHeaderRows(html)
 
 	// Remove span tags inside table cells (especially nolink spans)
 	html = regexp.MustCompile(`<span[^>]*class="[^"]*nolink[^"]*"[^>]*>([\s\S]*?)</span>`).ReplaceAllString(html, "$1")
@@ -392,6 +401,26 @@ func flattenCellLists(inner string) string {
 	inner = cellListTagPattern.ReplaceAllString(inner, "")
 	inner = cellListItemTagPattern.ReplaceAllString(inner, "")
 	return inner
+}
+
+// promoteTableHeaderRows wraps a table's first row in <thead> when the table has
+// no explicit header but that first row is built from <th> cells. Confluence
+// exports place header cells inside <tbody> with no <thead>, which makes pandoc
+// synthesize an empty header row and demote the real headers into the table body.
+// Promoting the row yields a proper Markdown table header.
+func promoteTableHeaderRows(html string) string {
+	return tableBlockPattern.ReplaceAllStringFunc(html, func(table string) string {
+		if strings.Contains(table, "<thead>") {
+			return table // already has an explicit header
+		}
+		firstRow := tableRowPattern.FindString(table)
+		if firstRow == "" || !strings.Contains(firstRow, "<th>") {
+			return table // first row is not a header row; leave as-is
+		}
+		// Lift the first row out of the body and into a <thead> after <table>.
+		rest := strings.Replace(table, firstRow, "", 1)
+		return strings.Replace(rest, "<table>", "<table><thead>"+firstRow+"</thead>", 1)
+	})
 }
 
 // cleanListItemText extracts the plain inline text of a single <li> item,

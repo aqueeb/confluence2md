@@ -970,6 +970,46 @@ func TestPreProcessHTML_TableCellPlainParagraphsUnchanged(t *testing.T) {
 	}
 }
 
+func TestPreProcessHTML_PromoteHeaderRow(t *testing.T) {
+	// Confluence puts <th> cells in <tbody> with no <thead>; the first row should
+	// be lifted into a <thead> so pandoc emits a real Markdown table header.
+	input := `<table><tbody><tr><th><p>H1</p></th><th><p>H2</p></th></tr>` +
+		`<tr><td><p>a</p></td><td><p>b</p></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if !strings.Contains(result, "<thead>") {
+		t.Errorf("Expected first header row to be wrapped in <thead>, got: %s", result)
+	}
+	// The header row must appear inside thead, before tbody.
+	if !strings.Contains(result, "<thead><tr><th>H1</th><th>H2</th></tr></thead>") {
+		t.Errorf("Expected promoted header row, got: %s", result)
+	}
+}
+
+func TestPreProcessHTML_PromoteHeaderRow_NoChangeWhenNoHeaderCells(t *testing.T) {
+	// A table whose first row is data (<td>) must be left untouched.
+	input := `<table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if strings.Contains(result, "<thead>") {
+		t.Errorf("Expected no <thead> for a header-less table, got: %s", result)
+	}
+}
+
+func TestPreProcessHTML_PromoteHeaderRow_KeepsExistingThead(t *testing.T) {
+	// A table that already has a <thead> must not be modified.
+	input := `<table><thead><tr><th>H1</th></tr></thead><tbody><tr><td>a</td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	// Exactly one thead, and no duplicate wrapping.
+	if strings.Count(result, "<thead>") != 1 {
+		t.Errorf("Expected exactly one <thead>, got: %s", result)
+	}
+}
+
 func TestPostProcessMarkdown_CellLineBreakSentinel(t *testing.T) {
 	input := "| left side:" + cellLineBreakSentinel + "• foo" + cellLineBreakSentinel + "• bar | right side |"
 
@@ -1016,6 +1056,20 @@ func TestConvertHTMLToMarkdown_TableWithListCell(t *testing.T) {
 	// The flattened list should render as line-broken bullets inside the cell.
 	if !strings.Contains(md, "left side:<br>• foo<br>• bar") {
 		t.Errorf("Expected line-broken bullet cell, got: %s", md)
+	}
+
+	// The header row should be promoted: the "title" row must be immediately
+	// followed by the Markdown separator (no empty synthesized header above it).
+	lines := strings.Split(md, "\n")
+	headerPromoted := false
+	for i, line := range lines {
+		if strings.Contains(line, "**title 1**") && i+1 < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i+1]), "|-") {
+			headerPromoted = true
+			break
+		}
+	}
+	if !headerPromoted {
+		t.Errorf("Expected header row promoted (followed by separator), got: %s", md)
 	}
 }
 
