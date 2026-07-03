@@ -1010,6 +1010,133 @@ func TestPreProcessHTML_PromoteHeaderRow_KeepsExistingThead(t *testing.T) {
 	}
 }
 
+// --- Phase 1 (TDD): edge cases expected to fail against the current code ---
+
+func TestFlattenCellLists_DropsEmptyItems(t *testing.T) {
+	// Empty or whitespace-only <li> items must not produce stray empty bullets.
+	input := `<table><tbody><tr><td><ul><li></li><li>x</li><li>  </li></ul></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if !strings.Contains(result, "<td>• x</td>") {
+		t.Errorf("Expected a single non-empty bullet (<td>• x</td>), got: %s", result)
+	}
+}
+
+func TestPreProcessHTML_SentinelCollisionNeutralized(t *testing.T) {
+	// User content that literally contains the internal sentinel must not be able
+	// to inject a line break; the sentinel should be stripped from the input.
+	input := `<p>literal ` + cellLineBreakSentinel + ` text</p>`
+
+	result := preProcessHTML(input)
+
+	if strings.Contains(result, cellLineBreakSentinel) {
+		t.Errorf("Expected pre-existing sentinel to be neutralized, got: %s", result)
+	}
+}
+
+func TestPreProcessHTML_MixedHeaderRowNotPromoted(t *testing.T) {
+	// A first row mixing <th> and <td> is not a genuine header row and must not
+	// be lifted into <thead>.
+	input := `<table><tbody><tr><th>H</th><td>d</td></tr><tr><td>a</td><td>b</td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if strings.Contains(result, "<thead>") {
+		t.Errorf("Expected a mixed th/td first row NOT to be promoted, got: %s", result)
+	}
+}
+
+// --- Phase 3 (TDD): regression locks for behavior that should already be correct ---
+
+func TestFlattenCellLists_OrderedListsRestartNumbering(t *testing.T) {
+	// Two separate ordered lists in one cell must each restart numbering at 1.
+	input := `<table><tbody><tr><td><ol><li>a</li><li>b</li></ol><ol><li>c</li><li>d</li></ol></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	for _, want := range []string{"1. a", "2. b", "1. c", "2. d"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("Expected %q in numbered output, got: %s", want, result)
+		}
+	}
+}
+
+func TestFlattenCellLists_OrderedEmptyItemAndStrayLi(t *testing.T) {
+	// Covers: an empty <li> in an ordered list (skipped, numbering not consumed),
+	// and stray <li> elements outside any recognized list (bulleted / dropped).
+	input := `<table><tbody><tr><td><ol><li></li><li>keep</li></ol><li>stray</li><li></li></td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if !strings.Contains(result, "1. keep") {
+		t.Errorf("Expected ordered numbering to skip the empty item, got: %s", result)
+	}
+	if !strings.Contains(result, "• stray") {
+		t.Errorf("Expected stray <li> to be bulleted, got: %s", result)
+	}
+	if strings.Contains(result, "<li") || strings.Contains(result, "<ol") {
+		t.Errorf("Expected no list tags to survive, got: %s", result)
+	}
+}
+
+func TestPreProcessHTML_MultipleTablesHeaderPromotion(t *testing.T) {
+	// Every table in the document with a pure header row should be promoted.
+	input := `<table><tbody><tr><th>A</th></tr><tr><td>1</td></tr></tbody></table>` +
+		`<table><tbody><tr><th>B</th></tr><tr><td>2</td></tr></tbody></table>`
+
+	result := preProcessHTML(input)
+
+	if got := strings.Count(result, "<thead>"); got != 2 {
+		t.Errorf("Expected both tables promoted (2 <thead>), got %d: %s", got, result)
+	}
+}
+
+func TestConvertHTMLToMarkdown_ListItemInlineFormatting(t *testing.T) {
+	// Inline formatting and links inside list items must survive into Markdown.
+	if err := CheckPandoc(); err != nil {
+		t.Skipf("Pandoc not installed, skipping test: %v", err)
+	}
+
+	html := `<table><tbody><tr><th>H</th></tr>` +
+		`<tr><td><ul><li><strong>bold</strong></li><li><a href="https://ex.com">link</a></li></ul></td></tr></tbody></table>`
+
+	md, err := ConvertHTMLToMarkdown(html)
+	if err != nil {
+		t.Fatalf("ConvertHTMLToMarkdown failed: %v", err)
+	}
+
+	if strings.Contains(md, "<table") || strings.Contains(md, "<ul") {
+		t.Errorf("Expected a Markdown table (no raw HTML), got: %s", md)
+	}
+	for _, want := range []string{"• **bold**", "• [link](https://ex.com)"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("Expected %q, got: %s", want, md)
+		}
+	}
+}
+
+func TestConvertHTMLToMarkdown_HeaderOnlyTable(t *testing.T) {
+	// A table whose only row is a header must convert without crashing or falling
+	// back to raw HTML.
+	if err := CheckPandoc(); err != nil {
+		t.Skipf("Pandoc not installed, skipping test: %v", err)
+	}
+
+	html := `<table><tbody><tr><th>Only</th><th>Header</th></tr></tbody></table>`
+
+	md, err := ConvertHTMLToMarkdown(html)
+	if err != nil {
+		t.Fatalf("ConvertHTMLToMarkdown failed: %v", err)
+	}
+	if strings.Contains(md, "<table") {
+		t.Errorf("Expected a Markdown table (no raw HTML), got: %s", md)
+	}
+	if !strings.Contains(md, "Only") || !strings.Contains(md, "Header") {
+		t.Errorf("Expected header content preserved, got: %s", md)
+	}
+}
+
 func TestPostProcessMarkdown_CellLineBreakSentinel(t *testing.T) {
 	input := "| left side:" + cellLineBreakSentinel + "• foo" + cellLineBreakSentinel + "• bar | right side |"
 
