@@ -22,6 +22,14 @@ const (
 	// maxASCIICodePoint is the maximum code point for ASCII characters.
 	// Used when decoding numeric HTML entities to only decode printable ASCII.
 	maxASCIICodePoint = 127
+
+	// cellLineBreakSentinel is a placeholder inserted during pre-processing to
+	// mark line breaks inside a table cell (e.g. between flattened list items).
+	// Pandoc's GFM writer dumps an entire table as raw HTML when a cell contains
+	// block-level content or a hard <br>, so we flatten cell content to a single
+	// inline line and use this sentinel to stand in for the breaks, then restore
+	// real <br> tags in post-processing (after pandoc has produced a pipe table).
+	cellLineBreakSentinel = "@@C2MDBR@@"
 )
 
 // htmlEntityMap maps HTML entities to their decoded characters.
@@ -40,6 +48,25 @@ var htmlEntityMap = map[string]string{
 	"&#38;":  "&",
 	"&nbsp;": " ",
 }
+
+// Compiled patterns used to flatten <ul>/<ol> list markup inside table cells.
+// Pandoc's GFM writer emits an entire table as raw HTML when any cell holds
+// block-level content (a list), so lists are rewritten as inline "• item" /
+// "N. item" segments before conversion. See flattenCellLists.
+var (
+	cellOrderedListPattern   = regexp.MustCompile(`(?is)<ol[^>]*>.*?</ol>`)
+	cellUnorderedListPattern = regexp.MustCompile(`(?is)<ul[^>]*>.*?</ul>`)
+	cellListItemPattern      = regexp.MustCompile(`(?is)<li[^>]*>.*?</li>`)
+	cellListTagPattern       = regexp.MustCompile(`(?is)</?[uo]l[^>]*>`)
+	cellListItemTagPattern   = regexp.MustCompile(`(?is)</?li[^>]*>`)
+	cellParagraphOpenPattern = regexp.MustCompile(`<p[^>]*>`)
+	cellBreakPattern         = regexp.MustCompile(`<br\s*/?>`)
+	whitespaceRunPattern     = regexp.MustCompile(`\s+`)
+
+	// Patterns for promoting a table's header row (see promoteTableHeaderRows).
+	tableBlockPattern = regexp.MustCompile(`(?is)<table>.*?</table>`)
+	tableRowPattern   = regexp.MustCompile(`(?is)<tr>.*?</tr>`)
+)
 
 // CheckPandoc verifies that pandoc is available (embedded or in PATH).
 func CheckPandoc() error {
@@ -265,7 +292,8 @@ func preProcessHTML(html string) string {
 	html = regexp.MustCompile(`<thead[^>]*>`).ReplaceAllString(html, "<thead>")
 	html = regexp.MustCompile(`<tbody[^>]*>`).ReplaceAllString(html, "<tbody>")
 	html = regexp.MustCompile(`<tr[^>]*>`).ReplaceAllString(html, "<tr>")
-	html = regexp.MustCompile(`<th[^>]*>`).ReplaceAllString(html, "<th>")
+	// Match <th> and <th ...> but NOT <thead>, which shares the "<th" prefix.
+	html = regexp.MustCompile(`<th(?:\s[^>]*)?>`).ReplaceAllString(html, "<th>")
 	html = regexp.MustCompile(`<td[^>]*>`).ReplaceAllString(html, "<td>")
 
 	// Remove <br> tags inside table cells (pandoc can't handle them and falls back to HTML)
@@ -278,20 +306,42 @@ func preProcessHTML(html string) string {
 	// Remove <p> tags inside table cells (unwrap content)
 	// First handle simple single-p cells
 	html = regexp.MustCompile(`(<t[dh]>)\s*<p>([^<]*)</p>\s*(</t[dh]>)`).ReplaceAllString(html, "$1$2$3")
-	// Handle multiple <p> tags in cells - convert to text with spaces
+	// Flatten each cell's content to a single inline line so pandoc produces a
+	// Markdown pipe table. Lists become "• item" / "N. item" segments and
+	// paragraphs are unwrapped; the sentinel marks intra-cell line breaks and is
+	// turned back into <br> during post-processing.
 	html = regexp.MustCompile(`(<t[dh]>)([\s\S]*?)(</t[dh]>)`).ReplaceAllStringFunc(html, func(match string) string {
-		// Remove <p> and </p> tags inside cells, replace with space
-		inner := regexp.MustCompile(`<t[dh]>`).ReplaceAllString(match, "")
-		inner = regexp.MustCompile(`</t[dh]>`).ReplaceAllString(inner, "")
-		inner = regexp.MustCompile(`<p[^>]*>`).ReplaceAllString(inner, "")
-		inner = regexp.MustCompile(`</p>`).ReplaceAllString(inner, " ")
+		isHeader := strings.HasPrefix(match, "<th")
+		inner := regexp.MustCompile(`</?t[dh]>`).ReplaceAllString(match, "")
+
+		// Rewrite <ul>/<ol> lists into inline, sentinel-separated item segments.
+		inner = flattenCellLists(inner)
+
+		// Unwrap paragraphs (join with a space) and collapse any stray <br>,
+		// which would otherwise force pandoc's raw-HTML table fallback.
+		inner = cellParagraphOpenPattern.ReplaceAllString(inner, "")
+		inner = strings.ReplaceAll(inner, "</p>", " ")
+		inner = cellBreakPattern.ReplaceAllString(inner, " ")
+
+		// Collapse all real whitespace (including source newlines) to single
+		// spaces so only the intentional sentinels remain as line breaks, then
+		// tidy spaces around the sentinels and trim stray ones at the edges.
+		inner = whitespaceRunPattern.ReplaceAllString(inner, " ")
+		inner = strings.ReplaceAll(inner, " "+cellLineBreakSentinel, cellLineBreakSentinel)
+		inner = strings.ReplaceAll(inner, cellLineBreakSentinel+" ", cellLineBreakSentinel)
 		inner = strings.TrimSpace(inner)
-		// Detect if it was th or td
-		if strings.HasPrefix(match, "<th") {
+		inner = strings.TrimPrefix(inner, cellLineBreakSentinel)
+		inner = strings.TrimSuffix(inner, cellLineBreakSentinel)
+
+		if isHeader {
 			return "<th>" + inner + "</th>"
 		}
 		return "<td>" + inner + "</td>"
 	})
+
+	// Promote header rows so pandoc emits a real Markdown table header instead of
+	// an empty one (Confluence puts <th> cells inside <tbody> with no <thead>).
+	html = promoteTableHeaderRows(html)
 
 	// Remove span tags inside table cells (especially nolink spans)
 	html = regexp.MustCompile(`<span[^>]*class="[^"]*nolink[^"]*"[^>]*>([\s\S]*?)</span>`).ReplaceAllString(html, "$1")
@@ -315,6 +365,75 @@ func preProcessHTML(html string) string {
 	}
 
 	return html
+}
+
+// flattenCellLists rewrites <ul>/<ol> lists found inside a single table cell into
+// inline text: each item becomes a "• item" (unordered) or "N. item" (ordered)
+// segment preceded by cellLineBreakSentinel. Pandoc would otherwise emit the whole
+// table as raw HTML because pipe-table cells cannot hold block-level list content.
+//
+// Limitation: nested sub-lists are flattened to a single bullet level (their items
+// are still preserved as text, just without indentation).
+func flattenCellLists(inner string) string {
+	// Ordered lists first so their items get numbers rather than bullets.
+	inner = cellOrderedListPattern.ReplaceAllStringFunc(inner, func(block string) string {
+		n := 0
+		items := cellListItemPattern.ReplaceAllStringFunc(block, func(li string) string {
+			n++
+			return fmt.Sprintf("%s%d. %s", cellLineBreakSentinel, n, cleanListItemText(li))
+		})
+		return cellListTagPattern.ReplaceAllString(items, "")
+	})
+
+	// Unordered lists.
+	inner = cellUnorderedListPattern.ReplaceAllStringFunc(inner, func(block string) string {
+		items := cellListItemPattern.ReplaceAllStringFunc(block, func(li string) string {
+			return cellLineBreakSentinel + "• " + cleanListItemText(li)
+		})
+		return cellListTagPattern.ReplaceAllString(items, "")
+	})
+
+	// Defensive: bullet any <li> not wrapped in a recognized list, then drop any
+	// leftover list container/item tags so none survive into pandoc.
+	inner = cellListItemPattern.ReplaceAllStringFunc(inner, func(li string) string {
+		return cellLineBreakSentinel + "• " + cleanListItemText(li)
+	})
+	inner = cellListTagPattern.ReplaceAllString(inner, "")
+	inner = cellListItemTagPattern.ReplaceAllString(inner, "")
+	return inner
+}
+
+// promoteTableHeaderRows wraps a table's first row in <thead> when the table has
+// no explicit header but that first row is built from <th> cells. Confluence
+// exports place header cells inside <tbody> with no <thead>, which makes pandoc
+// synthesize an empty header row and demote the real headers into the table body.
+// Promoting the row yields a proper Markdown table header.
+func promoteTableHeaderRows(html string) string {
+	return tableBlockPattern.ReplaceAllStringFunc(html, func(table string) string {
+		if strings.Contains(table, "<thead>") {
+			return table // already has an explicit header
+		}
+		firstRow := tableRowPattern.FindString(table)
+		if firstRow == "" || !strings.Contains(firstRow, "<th>") {
+			return table // first row is not a header row; leave as-is
+		}
+		// Lift the first row out of the body and into a <thead> after <table>.
+		rest := strings.Replace(table, firstRow, "", 1)
+		return strings.Replace(rest, "<table>", "<table><thead>"+firstRow+"</thead>", 1)
+	})
+}
+
+// cleanListItemText extracts the plain inline text of a single <li> item,
+// unwrapping paragraphs and collapsing whitespace to a single line. Inline
+// formatting (e.g. <strong>) is left intact for pandoc to convert.
+func cleanListItemText(li string) string {
+	t := cellListItemTagPattern.ReplaceAllString(li, "")
+	t = cellParagraphOpenPattern.ReplaceAllString(t, "")
+	t = strings.ReplaceAll(t, "</p>", " ")
+	t = cellListTagPattern.ReplaceAllString(t, " ")
+	t = cellBreakPattern.ReplaceAllString(t, " ")
+	t = whitespaceRunPattern.ReplaceAllString(t, " ")
+	return strings.TrimSpace(t)
 }
 
 // postProcessMarkdown cleans up Confluence-specific HTML artifacts from the converted Markdown.
@@ -524,6 +643,13 @@ func postProcessMarkdown(md string) string {
 	for code, emoji := range textEmojis {
 		md = strings.ReplaceAll(md, code, emoji)
 	}
+
+	// Restore intra-cell line breaks. The sentinel was inserted during
+	// pre-processing (see flattenCellLists) so pandoc would keep tables as
+	// Markdown pipe tables; now that conversion is done, turn it into a literal
+	// <br>, which GitHub renders as a line break inside the cell. This runs last
+	// so the earlier <br>-to-newline cleanup does not clobber it.
+	md = strings.ReplaceAll(md, cellLineBreakSentinel, "<br>")
 
 	return md
 }
