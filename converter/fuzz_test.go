@@ -61,6 +61,20 @@ func FuzzPreProcessHTML(f *testing.F) {
 		`<td><p>Paragraph in cell</p></td>`,
 		`<div class="table-wrap"><table><tr><td>Cell</td></tr></table></div>`,
 
+		// Lists inside table cells (issue #6) and header-row promotion
+		`<table><tbody><tr><th>H1</th><th>H2</th></tr><tr><td>intro:<ul><li>a</li><li>b</li></ul></td><td>x</td></tr></tbody></table>`,
+		`<table><tbody><tr><td><ol><li>one</li><li>two</li></ol></td></tr></tbody></table>`,
+		`<td><ul><li></li><li></li><li>  </li></ul></td>`,
+		`<td>top<ul><li>a<ul><li>nested</li></ul></li><li>b</li></ul></td>`,
+		`<table><tbody><tr><th>H</th><td>d</td></tr><tr><td>a</td><td>b</td></tr></tbody></table>`,
+		`<table><tbody><tr><th>Only</th></tr></tbody></table>`,
+		`<ul><li>unclosed list item`,
+		`<ul><li>a</li><li>b`,
+		`<table><tr><th>x</th><ul><li>malformed</li></ul></tr></table>`,
+		strings.Repeat(`<li></li>`, 100),
+		`<td>literal @@C2MDBR@@ sentinel</td>`,
+		`<table><tbody><tr><td><ul><li><strong>b</strong></li><li><a href="u">l</a></li></ul></td></tr></tbody></table>`,
+
 		// Spans (various classes)
 		`<span class="nolink">No link text</span>`,
 		`<span class="status-macro aui-lozenge">STATUS</span>`,
@@ -207,6 +221,12 @@ func FuzzPostProcessMarkdown(f *testing.F) {
 		"Line 1<br>Line 2",
 		"Line 1<br/>Line 2",
 		"Line 1<br />Line 2",
+
+		// Intra-cell line-break sentinel (restored to <br> by post-processing)
+		"| a" + cellLineBreakSentinel + "b |",
+		cellLineBreakSentinel,
+		"text " + cellLineBreakSentinel + " more",
+		strings.Repeat(cellLineBreakSentinel, 100),
 
 		// Multiple newlines
 		"Line 1\n\n\n\n\nLine 2",
