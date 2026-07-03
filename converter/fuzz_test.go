@@ -75,6 +75,11 @@ func FuzzPreProcessHTML(f *testing.F) {
 		`<td>literal @@C2MDBR@@ sentinel</td>`,
 		`<table><tbody><tr><td><ul><li><strong>b</strong></li><li><a href="u">l</a></li></ul></td></tr></tbody></table>`,
 
+		// Unhandled macro wrappers (issue #5)
+		`<div class="conf-macro output-block" data-macro-name="change-history"><table><tr><td>1.0</td></tr></table></div>`,
+		`<div class="plugin_attachments_container"><div class="plugin_attachments_table_title">Attachments</div></div>`,
+		`<section><p>section body</p></section>`,
+
 		// Spans (various classes)
 		`<span class="nolink">No link text</span>`,
 		`<span class="status-macro aui-lozenge">STATUS</span>`,
@@ -227,6 +232,17 @@ func FuzzPostProcessMarkdown(f *testing.F) {
 		cellLineBreakSentinel,
 		"text " + cellLineBreakSentinel + " more",
 		strings.Repeat(cellLineBreakSentinel, 100),
+
+		// Residual macro wrapper HTML (issue #5)
+		`<div class="conf-macro output-block">Inner</div>`,
+		"<div class=\"a\">\n\n<div class=\"b\">\n\nnested\n\n</div>\n\n</div>",
+		"<section><article>body</article></section>",
+		"<figure><figcaption>cap</figcaption></figure>",
+		"```\n<div class=\"in-code\">sample</div>\n```",
+		"<div>only open",
+		"</div> only close",
+		"<details><summary>keep</summary><div>drop wrapper</div></details>",
+		strings.Repeat(`<div class="x">`, 100) + "content" + strings.Repeat("</div>", 100),
 
 		// Multiple newlines
 		"Line 1\n\n\n\n\nLine 2",
