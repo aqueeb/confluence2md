@@ -200,6 +200,10 @@ func decodeHTMLEntities(html string) string {
 // preProcessHTML removes Confluence layout markup before Pandoc conversion.
 // This ensures layout divs don't get escaped and pollute the output.
 func preProcessHTML(html string) string {
+	// Neutralize any pre-existing occurrence of our internal sentinel so that
+	// source content can never inject an intra-cell line break (see flattenCellLists).
+	html = strings.ReplaceAll(html, cellLineBreakSentinel, "")
+
 	// First, decode HTML entities that represent actual HTML tags
 	// Confluence sometimes double-encodes HTML, resulting in &lt;p&gt; instead of <p>
 	html = decodeHTMLEntities(html)
@@ -375,20 +379,29 @@ func preProcessHTML(html string) string {
 // Limitation: nested sub-lists are flattened to a single bullet level (their items
 // are still preserved as text, just without indentation).
 func flattenCellLists(inner string) string {
-	// Ordered lists first so their items get numbers rather than bullets.
+	// Ordered lists first so their items get numbers rather than bullets. Empty
+	// items are dropped so they don't leave a stray "N. " with no text.
 	inner = cellOrderedListPattern.ReplaceAllStringFunc(inner, func(block string) string {
 		n := 0
 		items := cellListItemPattern.ReplaceAllStringFunc(block, func(li string) string {
+			text := cleanListItemText(li)
+			if text == "" {
+				return ""
+			}
 			n++
-			return fmt.Sprintf("%s%d. %s", cellLineBreakSentinel, n, cleanListItemText(li))
+			return fmt.Sprintf("%s%d. %s", cellLineBreakSentinel, n, text)
 		})
 		return cellListTagPattern.ReplaceAllString(items, "")
 	})
 
-	// Unordered lists.
+	// Unordered lists (empty items dropped).
 	inner = cellUnorderedListPattern.ReplaceAllStringFunc(inner, func(block string) string {
 		items := cellListItemPattern.ReplaceAllStringFunc(block, func(li string) string {
-			return cellLineBreakSentinel + "• " + cleanListItemText(li)
+			text := cleanListItemText(li)
+			if text == "" {
+				return ""
+			}
+			return cellLineBreakSentinel + "• " + text
 		})
 		return cellListTagPattern.ReplaceAllString(items, "")
 	})
@@ -396,7 +409,11 @@ func flattenCellLists(inner string) string {
 	// Defensive: bullet any <li> not wrapped in a recognized list, then drop any
 	// leftover list container/item tags so none survive into pandoc.
 	inner = cellListItemPattern.ReplaceAllStringFunc(inner, func(li string) string {
-		return cellLineBreakSentinel + "• " + cleanListItemText(li)
+		text := cleanListItemText(li)
+		if text == "" {
+			return ""
+		}
+		return cellLineBreakSentinel + "• " + text
 	})
 	inner = cellListTagPattern.ReplaceAllString(inner, "")
 	inner = cellListItemTagPattern.ReplaceAllString(inner, "")
@@ -414,8 +431,8 @@ func promoteTableHeaderRows(html string) string {
 			return table // already has an explicit header
 		}
 		firstRow := tableRowPattern.FindString(table)
-		if firstRow == "" || !strings.Contains(firstRow, "<th>") {
-			return table // first row is not a header row; leave as-is
+		if firstRow == "" || !strings.Contains(firstRow, "<th>") || strings.Contains(firstRow, "<td>") {
+			return table // promote only a genuine, all-<th> header row
 		}
 		// Lift the first row out of the body and into a <thead> after <table>.
 		rest := strings.Replace(table, firstRow, "", 1)
