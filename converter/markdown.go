@@ -66,6 +66,13 @@ var (
 	// Patterns for promoting a table's header row (see promoteTableHeaderRows).
 	tableBlockPattern = regexp.MustCompile(`(?is)<table>.*?</table>`)
 	tableRowPattern   = regexp.MustCompile(`(?is)<tr>.*?</tr>`)
+
+	// residualWrapperTagPattern matches opening/closing <div> and non-semantic
+	// HTML5 sectioning wrappers left by unhandled Confluence macros (issue #5).
+	// These carry no Markdown meaning, so the tags are removed while their inner
+	// content is kept. Tags the converter intentionally emits (<br>, <details>,
+	// <summary>, <img>) and table tags are deliberately excluded.
+	residualWrapperTagPattern = regexp.MustCompile(`(?i)</?(?:figcaption|figure|section|article|header|footer|aside|nav|div)(?:\s[^>]*)?>`)
 )
 
 // CheckPandoc verifies that pandoc is available (embedded or in PATH).
@@ -571,6 +578,13 @@ func postProcessMarkdown(md string) string {
 
 	// Remove any remaining span tags
 	md = regexp.MustCompile(`</?span[^>]*>`).ReplaceAllString(md, "")
+
+	// Strip residual HTML wrapper tags left by unhandled Confluence macros
+	// (issue #5): opening/closing <div> and non-semantic sectioning wrappers carry
+	// no Markdown meaning, so drop the tags but keep their inner content. This runs
+	// after every specific macro conversion above; intentionally emitted tags
+	// (<br>, <details>, <summary>, <img>, table tags) are excluded from the set.
+	md = residualWrapperTagPattern.ReplaceAllString(md, "")
 
 	// Clean up HTML entities using the shared map
 	for entity, char := range htmlEntityMap {
