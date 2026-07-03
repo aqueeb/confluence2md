@@ -1200,6 +1200,100 @@ func TestConvertHTMLToMarkdown_TableWithListCell(t *testing.T) {
 	}
 }
 
+// --- Issue #5: residual-HTML (unhandled macro) cleanup ---
+
+// Phase 1 (TDD): expected RED against the current code.
+
+func TestPostProcessMarkdown_StripsResidualMacroDiv(t *testing.T) {
+	// An unrecognized macro wrapper leaks its opening <div ...> today.
+	input := "Before\n\n<div class=\"conf-macro output-block\">\n\nInner text\n\n</div>\n\nAfter"
+
+	result := postProcessMarkdown(input)
+
+	if strings.Contains(result, "<div") {
+		t.Errorf("Expected residual <div> to be stripped, got: %s", result)
+	}
+	for _, want := range []string{"Before", "Inner text", "After"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("Expected %q preserved, got: %s", want, result)
+		}
+	}
+}
+
+func TestPostProcessMarkdown_StripsSectioningWrappers(t *testing.T) {
+	input := "<section class=\"x\">\n\nSection body\n\n</section>\n\n<figure>\n\nFig\n\n</figure>"
+
+	result := postProcessMarkdown(input)
+
+	for _, tag := range []string{"<section", "</section>", "<figure", "</figure>"} {
+		if strings.Contains(result, tag) {
+			t.Errorf("Expected %s to be stripped, got: %s", tag, result)
+		}
+	}
+	if !strings.Contains(result, "Section body") || !strings.Contains(result, "Fig") {
+		t.Errorf("Expected content preserved, got: %s", result)
+	}
+}
+
+func TestConvertHTMLToMarkdown_StripsMacroWrappers(t *testing.T) {
+	if err := CheckPandoc(); err != nil {
+		t.Skipf("Pandoc not installed, skipping test: %v", err)
+	}
+
+	html := `<html><body>
+<p>Intro.</p>
+<div class="conf-macro output-block" data-macro-name="change-history">
+<table><thead><tr><th>Version</th></tr></thead><tbody><tr><td>1.0</td></tr></tbody></table>
+</div>
+<div class="plugin_attachments_container"><div class="plugin_attachments_table_title">Attachments</div></div>
+<p>End.</p>
+</body></html>`
+
+	md, err := ConvertHTMLToMarkdown(html)
+	if err != nil {
+		t.Fatalf("ConvertHTMLToMarkdown failed: %v", err)
+	}
+
+	if strings.Contains(md, "<div") || strings.Contains(md, "<span") {
+		t.Errorf("Expected no residual div/span HTML, got: %s", md)
+	}
+	for _, want := range []string{"Intro.", "Version", "1.0", "Attachments", "End."} {
+		if !strings.Contains(md, want) {
+			t.Errorf("Expected %q to survive, got: %s", want, md)
+		}
+	}
+}
+
+// Phase 2/3 (TDD): preserve-set locks — must pass after the fix and never regress.
+
+func TestPostProcessMarkdown_PreservesIntentionalHTML(t *testing.T) {
+	input := "<details>\n<summary>More</summary>\n\nHidden\n\n</details>\n\n<img src=\"a.png\" alt=\"pic\">"
+
+	result := postProcessMarkdown(input)
+
+	for _, want := range []string{"<details>", "<summary>", "</summary>", "</details>"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("Expected %q preserved, got: %s", want, result)
+		}
+	}
+	if !strings.Contains(result, "a.png") {
+		t.Errorf("Expected image preserved, got: %s", result)
+	}
+}
+
+func TestPostProcessMarkdown_PreservesRawTableTags(t *testing.T) {
+	// A pandoc raw-HTML fallback table must not be shredded by the cleanup.
+	input := "<table>\n<tr><td>cell</td></tr>\n</table>"
+
+	result := postProcessMarkdown(input)
+
+	for _, want := range []string{"<table>", "<tr>", "<td>", "cell"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("Expected %q preserved, got: %s", want, result)
+		}
+	}
+}
+
 func TestPostProcessMarkdown_AllEmojis(t *testing.T) {
 	// Test all text emoji shortcodes defined in the textEmojis map
 	tests := []struct {
